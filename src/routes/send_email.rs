@@ -8,6 +8,8 @@ use lettre::{
     Message, Transport,
 };
 
+use compound_duration::format_dhms;
+
 pub fn send_node_offline_notification_email(
     node_id: &String,
     notification_recipient_list: &String,
@@ -83,23 +85,25 @@ pub fn send_node_online_notification_email(
 ) {
     let offline_minutes = checkin_timestamp
         .signed_duration_since(*last_checkin_timestamp)
-        .num_minutes();
+        .num_seconds();
 
     let checkin_timestamp_riga_time = Riga.from_utc_datetime(&checkin_timestamp);
 
     let subject = format!("Node ON-line: {}", node_id);
 
+    let offline_duration_text = format_dhms(offline_minutes);
+
     let body_plain = format!(
-        "Node - {} - is ON-line since {}. It was offline for {} minutes.",
+        "Node - {} - is ON-line since {}. It was offline for {}.",
         node_id,
         checkin_timestamp_riga_time.format("%Y-%m-%d %H:%M:%S"),
-        offline_minutes
+        offline_duration_text
     );
     let body_html = format!(
-        "Node - <b>{}</b> - is <span style='color:green'><b>ON-line</b></span> since {}. It was offline for {} minutes.",
+        "Node - <b>{}</b> - is <span style='color:green'><b>ON-line</b></span> since {}. It was offline for {}.",
         node_id,
         checkin_timestamp_riga_time.format("%Y-%m-%d %H:%M:%S"),
-        offline_minutes
+        offline_duration_text
     );
 
     let creds = Credentials::new("rpi@betras.lv".to_string(), "rB*&ZQ9>rB*&ZQ9>".to_string());

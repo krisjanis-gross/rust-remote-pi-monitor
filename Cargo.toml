@@ -26,3 +26,6 @@ serde = "1.0.131"
 serde_derive = "1.0.131"
 
 lettre = "0.10.0-rc.4"
+
+compound_duration = "1.2.0"
+
