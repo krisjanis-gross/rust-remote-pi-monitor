@@ -9,13 +9,21 @@ use lettre::{
 };
 
 use compound_duration::format_dhms;
+use std::env;
 
 pub fn send_node_offline_notification_email(
     node_id: &String,
     notification_recipient_list: &String,
     checkin_timestamp: &NaiveDateTime,
 ) {
-    let creds = Credentials::new("rpi@betras.lv".to_string(), "rB*&ZQ9>rB*&ZQ9>".to_string());
+    let env_variable_name = "email_account_password";
+    let mut email_account_password = String::new();
+
+    match env::var(env_variable_name) {
+        Ok(v) => email_account_password = v,
+        Err(e) => panic!("${} is not set ({})", env_variable_name, e),
+    }
+    let creds = Credentials::new("rpi@betras.lv".to_string(), email_account_password);
 
     // Open a remote connection to gmail
     let mailer = SmtpTransport::starttls_relay("smtp.gmail.com")
@@ -106,7 +114,18 @@ pub fn send_node_online_notification_email(
         offline_duration_text
     );
 
-    let creds = Credentials::new("rpi@betras.lv".to_string(), "rB*&ZQ9>rB*&ZQ9>".to_string());
+    let env_variable_name = "email_account_password";
+    let mut email_account_password = String::new();
+
+    match env::var(env_variable_name) {
+        Ok(v) => email_account_password = v,
+        Err(e) => panic!("${} is not set ({})", env_variable_name, e),
+    }
+    //    println!("Email account password = {}", email_account_password);
+    let creds = Credentials::new(
+        "rpi@betras.lv".to_string(),
+        email_account_password.to_string(),
+    );
 
     // Open a remote connection to gmail
     let mailer = SmtpTransport::starttls_relay("smtp.gmail.com")
