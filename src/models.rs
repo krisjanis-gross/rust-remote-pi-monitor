@@ -16,3 +16,14 @@ pub struct Nodeslist {
     pub notification_email_list: Option<String>,
     pub offline_notification_sent: i8,
 }
+#[derive(Serialize, Deserialize, Queryable)]
+pub struct SensorTriggersList {
+    pub sensor_triggers_id: i32,
+    pub node_id: i32,
+    pub sensor_id: String,
+    pub monitoring_enabled: i8,
+    pub trigger_notification_sent: i8,
+    pub validation_function: String,
+    pub validation_parameter_1: Option<f32>,
+    pub validation_parameter_2: Option<f32>,
+}
