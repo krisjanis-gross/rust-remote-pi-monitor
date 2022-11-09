@@ -229,11 +229,13 @@ pub fn sensor_trigger_check(
         // find sensor (or send error)
         let sensor_data_found = find_sensor_data_by_id(&sensor_trigger.sensor_id, sensor_data);
         let mut validation_result: (bool, String) = (false, "".to_string());
+        let sensor_name_email;
         match sensor_data_found {
             None => {
                 println!("sensor value not present. Sending notification");
                 validation_result.0 = false;
                 validation_result.1 = "Sensor value is missing".to_string();
+                sensor_name_email = "".to_string()
             } // not found -> notification
             Some(x) => {
                 validation_result = validate_sensor_data(
@@ -242,6 +244,7 @@ pub fn sensor_trigger_check(
                     &sensor_trigger.validation_parameter_2,
                     x.value,
                 );
+                sensor_name_email = x.sensor_name.clone();
                 println!("Validation result = {}", validation_result.0);
                 println!("Validation email message = {}", validation_result.1);
             } // perform validation
@@ -255,6 +258,7 @@ pub fn sensor_trigger_check(
                     node_checkin_timestamp,
                     &validation_result.1,
                     &sensor_trigger.sensor_id,
+                    &sensor_name_email
                 );
                 // update DB
                 diesel::update(
@@ -276,6 +280,7 @@ pub fn sensor_trigger_check(
                     node_checkin_timestamp,
                     &validation_result.1,
                     &sensor_trigger.sensor_id,
+                    &sensor_name_email
                 );
                 // update DB
                 diesel::update(
@@ -314,11 +319,11 @@ pub fn validate_sensor_data(
                         validation_result.0 = true;
                     } else {
                         validation_result.0 = false;
-                        validation_result.1 = format!(
-                            "expected value {} {:?}. Got {}",
-                            validation_function, x, sensor_value
-                        );
                     }
+                    validation_result.1 = format!(
+                        "expected value {} {:?}. Got {}",
+                        validation_function, x, sensor_value
+                    );
                 }
                 None => println!("can not validate. parameter missing"),
             }
@@ -399,7 +404,6 @@ pub fn validate_sensor_data(
                         validation_result.0 = true;
                     } else {
                         validation_result.0 = false;
-
                     }
                     validation_result.1 = format!(
                         "expected value {} {:?}. Got {}",
@@ -418,11 +422,9 @@ pub fn validate_sensor_data(
                             validation_result.0 = true;
                         } else {
                             validation_result.0 = false;
-
                         }
                         validation_result.1 =
                             format!("expected {} < value > {}. Got {}", x, y, sensor_value);
-                            
                     }
                     None => println!("can not validate. parameter missing"),
                 },

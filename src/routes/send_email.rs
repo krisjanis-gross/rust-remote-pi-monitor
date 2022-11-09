@@ -145,22 +145,25 @@ pub fn sensor_validation_failed_email(
     notification_recipient_list: &String,
     checkin_timestamp: &NaiveDateTime,
     validation_message: &String,
-    sensor_id: &String
+    sensor_id: &String,
+    sensor_name: &String
 ) {
     let checkin_timestamp_riga_time = Riga.from_utc_datetime(&checkin_timestamp);
 
-    let subject = format!("sensor validation FAILED: {}-{}", node_id, sensor_id);
+    let subject = format!("sensor validation FAILED: {}-{}", node_id, sensor_name);
 
     let body_plain = format!(
-        "Sensor validation FAILED:\n Node ID:{}\n Sensor ID: {}\n Timestamp: {}\n Validation: {}",
+        "Sensor validation FAILED:\n Node ID:{}\n Sensor Name: {}\n Sensor ID: {}\n Timestamp: {}\n Validation: {}",
         node_id,
+        sensor_name,
         sensor_id,
         checkin_timestamp_riga_time.format("%Y-%m-%d %H:%M:%S"),
         validation_message,
     );
     let body_html = format!(
-        "Sensor validation <span style='color:red'>FAILED</span>.<br> Node ID:{}<br> Sensor ID: {}<br> Timestamp: {}<br> Validation: <b>{}</b>",
+        "Sensor validation <span style='color:red'>FAILED</span>.<br> Node ID:{}<br>Sensor Name: {}<br> Sensor ID: {}<br> Timestamp: {}<br> Validation: <b>{}</b>",
         node_id,
+        sensor_name,
         sensor_id,
         checkin_timestamp_riga_time.format("%Y-%m-%d %H:%M:%S"),
         validation_message
@@ -180,22 +183,25 @@ pub fn sensor_validation_ok_email(
     notification_recipient_list: &String,
     checkin_timestamp: &NaiveDateTime,
     validation_message: &String,
-    sensor_id: &String
+    sensor_id: &String,
+    sensor_name: &String
 ) {
     let checkin_timestamp_riga_time = Riga.from_utc_datetime(&checkin_timestamp);
 
-    let subject = format!("Sensor validation OK: {}-{}", node_id, sensor_id);
+    let subject = format!("Sensor validation OK: {}-{}", node_id, sensor_name);
 
     let body_plain = format!(
-        "Sensor validation SUCCESSFUL:\n Node ID:{}\n Sensor ID: {}\n Timestamp: {}\n Validation: {}",
+        "Sensor validation SUCCESSFUL:\n Node ID:{}\n Sensor Name: {}\n Sensor ID: {}\n Timestamp: {}\n Validation: {}",
         node_id,
+        sensor_name,
         sensor_id,
         checkin_timestamp_riga_time.format("%Y-%m-%d %H:%M:%S"),
         validation_message
     );
     let body_html = format!(
-        "Sensor validation <span style='color:green'>SUCCESSFUL</span>.<br> Node ID:{}<br> Sensor ID: {}<br> Timestamp: {}<br> Validation: <b>{}</b>",
+        "Sensor validation <span style='color:green'>SUCCESSFUL</span>.<br> Node ID:{}<br>Sensor Name: {} <br> Sensor ID: {}<br> Timestamp: {}<br> Validation: <b>{}</b>",
         node_id,
+        sensor_name,
         sensor_id,
         checkin_timestamp_riga_time.format("%Y-%m-%d %H:%M:%S"),
         validation_message
