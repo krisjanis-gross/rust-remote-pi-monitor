@@ -13,11 +13,10 @@ use chrono::NaiveDateTime;
 
 #[get("/")]
 pub fn index() -> &'static str {
-    "Application successfully started!"
+    "remote-pi-monitor successfully started!"
 }
 
 // input parameters to the /checkin web service
-
 #[derive(Serialize, Deserialize)]
 pub struct SensorData {
     id: String,
