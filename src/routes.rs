@@ -193,28 +193,16 @@ pub fn sensor_trigger_check(
     //    2.1 send alerts if necessary
 
     use crate::schema::sensor_triggers::dsl::*;
+    // find sensor data triggers defined for this node
     let sensor_trigger_list = sensor_triggers
         .filter(node_id.eq(*node_id_internal))
         .filter(monitoring_enabled.eq(1))
         .load::<SensorTriggersList>(&dbconnection.0)
         .expect("error executing query to find triggers");
 
-    match sensor_data {
-        // The division was valid
-        Some(x) => {
-            // debug print sensor_values present in API call
-            for sensor_value in x {
-                println!(
-                    "received sensor data : id={} sensor_name={} value={:?}",
-                    sensor_value.id, sensor_value.sensor_name, sensor_value.value
-                );
-            }
-        }
-        // The division was invalid
-        None => println!("No sensor data present in API call"),
-    }
+    log_sensor_data(&sensor_data); // log to console
 
-    // debug print sensor_trigger_list
+    // iterate sensor triggers
     for sensor_trigger in sensor_trigger_list {
         println!(
 "Trigger check: sensor_triggers_id={} sensor_id={} monitoring_enabled={} trigger_notification_sent={} validation_function={} validation_parameter_1={:?} validation_parameter_2={:?} ",
@@ -458,4 +446,22 @@ pub fn find_sensor_data_by_id<'a>(
         None => function_return = None,
     }
     function_return
+}
+
+pub fn     log_sensor_data(sensor_data: &Option<Vec<SensorData>>)
+{
+    match sensor_data {
+        // The division was valid
+        Some(x) => {
+            // debug print sensor_values present in API call
+            for sensor_value in x {
+                println!(
+                    "received sensor data : id={} sensor_name={} value={:?}",
+                    sensor_value.id, sensor_value.sensor_name, sensor_value.value
+                );
+            }
+        }
+        // The division was invalid
+        None => println!("No sensor data present in API call"),
+    }
 }
