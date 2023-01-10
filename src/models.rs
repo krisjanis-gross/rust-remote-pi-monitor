@@ -27,3 +27,19 @@ pub struct SensorTriggersList {
     pub validation_parameter_1: Option<f32>,
     pub validation_parameter_2: Option<f32>,
 }
+
+
+// input parameters to the /checkin web service
+#[derive(Serialize, Deserialize)]
+pub struct SensorData {
+    pub(crate) id: String,
+    pub(crate) sensor_name: String,
+    pub(crate) value: f32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CheckinData {
+    pub(crate) api_key: String,
+    pub(crate) node_id: String,
+    pub(crate) sensor_data: Option<Vec<SensorData>>,
+}

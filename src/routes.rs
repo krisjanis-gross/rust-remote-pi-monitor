@@ -4,8 +4,12 @@ use rocket_contrib::json::Json;
 
 use crate::models::ApiKey;
 use crate::DbConn;
+use crate::models::CheckinData;
+use crate::models::SensorData;
+
 
 pub mod send_email;
+pub mod trigger_validation;
 
 use crate::models::SensorTriggersList;
 
@@ -16,20 +20,7 @@ pub fn index() -> &'static str {
     "remote-pi-monitor successfully started!"
 }
 
-// input parameters to the /checkin web service
-#[derive(Serialize, Deserialize)]
-pub struct SensorData {
-    id: String,
-    sensor_name: String,
-    value: f32,
-}
 
-#[derive(Serialize, Deserialize)]
-pub struct CheckinData {
-    api_key: String,
-    node_id: String,
-    sensor_data: Option<Vec<SensorData>>,
-}
 
 #[post("/checkin", data = "<checkin_data>")]
 pub fn process_node_checkin(
@@ -106,7 +97,7 @@ pub fn process_node_checkin(
 
         // check sensor values end
         } else {
-            println!("node not found. need to instert node in db");
+            println!("node not found. need to insert new node record in db");
             let insert_result = diesel::insert_into(nodes)
                 .values((
                     node_id_external.eq(&checkin_data.node_id),
@@ -114,7 +105,7 @@ pub fn process_node_checkin(
                     last_checkin_timestamp.eq(chrono::Utc::now().naive_utc()),
                 ))
                 .execute(&conn.0)
-                .expect("error executing query");
+                .expect("DB error executing query");
             println!("inserted rows count  = {:?}", insert_result);
         }
     } else {
@@ -178,6 +169,8 @@ pub fn index33() -> &'static str {
     "Application successfully started!"
 }
 
+
+
 pub fn sensor_trigger_check(
     node_id_internal: &i32,
     sensor_data: &Option<Vec<SensorData>>,
@@ -197,47 +190,52 @@ pub fn sensor_trigger_check(
         .filter(node_id.eq(*node_id_internal))
         .filter(monitoring_enabled.eq(1))
         .load::<SensorTriggersList>(&dbconnection.0)
-        .expect("error executing query to find triggers");
+        .expect("DB error executing query to find triggers");
 
     log_sensor_data(&sensor_data); // log to console
 
     // iterate sensor triggers
     for sensor_trigger in sensor_trigger_list {
         println!(
-"Trigger check: sensor_triggers_id={} sensor_id={} monitoring_enabled={} trigger_notification_sent={} validation_function={} validation_parameter_1={:?} validation_parameter_2={:?} ",
-                        sensor_trigger.sensor_triggers_id,
-                        sensor_trigger.sensor_id,
-                        sensor_trigger.monitoring_enabled,
-                        sensor_trigger.trigger_notification_sent,
-                        sensor_trigger.validation_function,
-                        sensor_trigger.validation_parameter_1,
-                        sensor_trigger.validation_parameter_2);
+            "Trigger check: sensor_triggers_id={} sensor_id={} monitoring_enabled={} trigger_notification_sent={} validation_function={} validation_parameter_1={:?} validation_parameter_2={:?} ",
+            sensor_trigger.sensor_triggers_id,
+            sensor_trigger.sensor_id,
+            sensor_trigger.monitoring_enabled,
+            sensor_trigger.trigger_notification_sent,
+            sensor_trigger.validation_function,
+            sensor_trigger.validation_parameter_1,
+            sensor_trigger.validation_parameter_2);
 
-        // find sensor (or send error)
-        let sensor_data_found = find_sensor_data_by_id(&sensor_trigger.sensor_id, sensor_data);
-        let mut validation_result: (bool, String) = (false, "".to_string());
-        let sensor_name_email;
+        // find sensor data in sensor_data list that matches the sensor_trigger and perform validation
+        let mut validation_result: (Option<bool>, String) = (None, "".to_string());
+        let mut sensor_name_email= "".to_string();
+
+        // find sensor data in sensor_data list
+        let sensor_data_found = trigger_validation::find_sensor_data_by_id(&sensor_trigger.sensor_id, sensor_data);
+
         match sensor_data_found {
-            None => {
-                println!("sensor value not present. Sending notification");
-                validation_result.0 = false;
-                validation_result.1 = "Sensor value is missing".to_string();
-                sensor_name_email = "".to_string()
-            } // not found -> notification
-            Some(x) => {
-                validation_result = validate_sensor_data(
+            None => { // case when sensor data is not present for this trigger
+                if sensor_trigger.trigger_notification_sent == 0 { // checking if notification has not been sent already
+                    println!("sensor value not present. Sending notification");
+                    validation_result.0 = Some(false);
+                    validation_result.1 = "Sensor value is missing ".to_string();
+                    sensor_name_email = "".to_string()
+                }
+            }
+            Some(x) => { // case when sensor data IS found and we need to validate the data against trigger validation function + parameters
+                validation_result = trigger_validation::validate_sensor_data(
                     &sensor_trigger.validation_function,
                     &sensor_trigger.validation_parameter_1,
                     &sensor_trigger.validation_parameter_2,
                     x.value,
                 );
                 sensor_name_email = x.sensor_name.clone();
-                println!("Validation result = {}", validation_result.0);
+                println!("Validation result = {:?}", validation_result.0);
                 println!("Validation email message = {}", validation_result.1);
-            } // perform validation
+            }
         }
-        // send notofications and update status in DB
-        if (validation_result.0 == false) & (sensor_trigger.trigger_notification_sent == 0) {
+        // send e-mail notifications (if needed)  and update status in DB
+        if (validation_result.0 == Some(false)) & (sensor_trigger.trigger_notification_sent == 0) {
             if let Some(x) = notification_email_list {
                 send_email::sensor_validation_failed_email(
                     node_id_external,
@@ -252,13 +250,13 @@ pub fn sensor_trigger_check(
                     sensor_triggers
                         .filter(sensor_triggers_id.eq(sensor_trigger.sensor_triggers_id)),
                 )
-                .set(trigger_notification_sent.eq(1))
-                .execute(&dbconnection.0)
-                .expect("error executing query");
+                    .set(trigger_notification_sent.eq(1))
+                    .execute(&dbconnection.0)
+                    .expect("error executing query");
             } else {
                 println!("Can not send notification. recipient list not set");
             }
-        } else if (validation_result.0 == true) & (sensor_trigger.trigger_notification_sent == 1) {
+        } else if (validation_result.0 == Some(true)) & (sensor_trigger.trigger_notification_sent == 1) {
             println!("sensor value is OK (was not OK) -> send notification");
             if let Some(x) = notification_email_list {
                 send_email::sensor_validation_ok_email(
@@ -274,9 +272,9 @@ pub fn sensor_trigger_check(
                     sensor_triggers
                         .filter(sensor_triggers_id.eq(sensor_trigger.sensor_triggers_id)),
                 )
-                .set(trigger_notification_sent.eq(0))
-                .execute(&dbconnection.0)
-                .expect("error executing query");
+                    .set(trigger_notification_sent.eq(0))
+                    .execute(&dbconnection.0)
+                    .expect("error executing query");
             } else {
                 println!("Can not send notification. recipient list not set");
             }
@@ -285,169 +283,7 @@ pub fn sensor_trigger_check(
     // switch/case based on validation validation_function
 }
 
-pub fn validate_sensor_data(
-    validation_function: &String,
-    validation_parameter_1: &Option<f32>,
-    validation_parameter_2: &Option<f32>,
-    sensor_value: f32,
-) -> (bool, String) {
-    println!(
-        "Sensor data validation. Function '{}' parameter1 '{:?}' parameter2 '{:?}' sensor value '{}'",
-        *validation_function, validation_parameter_1, validation_parameter_2,sensor_value
-    );
-    let mut validation_result: (bool, String) = (false, "".to_string());
-
-    match validation_function.as_str() {
-        ">" => {
-            println!("validation against > ");
-            match *validation_parameter_1 {
-                Some(x) => {
-                    if sensor_value > x {
-                        validation_result.0 = true;
-                    } else {
-                        validation_result.0 = false;
-                    }
-                    validation_result.1 = format!(
-                        "expected value {} {:?}. Got {}",
-                        validation_function, x, sensor_value
-                    );
-                }
-                None => println!("can not validate. parameter missing"),
-            }
-        }
-        ">=" => {
-            println!("validation against >= ");
-            match *validation_parameter_1 {
-                Some(x) => {
-                    if sensor_value >= x {
-                        validation_result.0 = true;
-                    } else {
-                        validation_result.0 = false;
-                    }
-                    validation_result.1 = format!(
-                        "expected value {} {:?}. Got {}",
-                        validation_function, x, sensor_value
-                    );
-                }
-                None => println!("can not validate. parameter missing"),
-            }
-        }
-        "<" => {
-            println!("validation against < ");
-            match *validation_parameter_1 {
-                Some(x) => {
-                    if sensor_value < x {
-                        validation_result.0 = true;
-                    } else {
-                        validation_result.0 = false;
-                    }
-                    validation_result.1 = format!(
-                        "expected value {} {:?}. Got {}",
-                        validation_function, x, sensor_value
-                    );
-                }
-                None => println!("can not validate. parameter missing"),
-            }
-        }
-        "<=" => {
-            println!("validation against <= ");
-            match *validation_parameter_1 {
-                Some(x) => {
-                    if sensor_value <= x {
-                        validation_result.0 = true;
-                    } else {
-                        validation_result.0 = false;
-                    }
-                    validation_result.1 = format!(
-                        "expected value {} {:?}. Got {}",
-                        validation_function, x, sensor_value
-                    );
-                }
-                None => println!("can not validate. parameter missing"),
-            }
-        }
-        "==" => {
-            println!("validation against == ");
-            match *validation_parameter_1 {
-                Some(x) => {
-                    if sensor_value == x {
-                        validation_result.0 = true;
-                    } else {
-                        validation_result.0 = false;
-                    }
-                    validation_result.1 = format!(
-                        "expected value {} {:?}. Got {}",
-                        validation_function, x, sensor_value
-                    );
-                }
-                None => println!("can not validate. parameter missing"),
-            }
-        }
-        "!=" => {
-            println!("validation against != ");
-            match *validation_parameter_1 {
-                Some(x) => {
-                    if sensor_value != x {
-                        validation_result.0 = true;
-                    } else {
-                        validation_result.0 = false;
-                    }
-                    validation_result.1 = format!(
-                        "expected value {} {:?}. Got {}",
-                        validation_function, x, sensor_value
-                    );
-                }
-                None => println!("can not validate. parameter missing"),
-            }
-        }
-        "b" => {
-            println!("validation against b ");
-            match *validation_parameter_1 {
-                Some(x) => match *validation_parameter_2 {
-                    Some(y) => {
-                        if (sensor_value > x) & (sensor_value < y) {
-                            validation_result.0 = true;
-                        } else {
-                            validation_result.0 = false;
-                        }
-                        validation_result.1 =
-                            format!("expected {} < value > {}. Got {}", x, y, sensor_value);
-                    }
-                    None => println!("can not validate. parameter missing"),
-                },
-                None => println!("can not validate. parameter missing"),
-            }
-        }
-        &_ => println!("Validation function unknown"),
-    }
-    validation_result
-}
-
-pub fn find_sensor_data_by_id<'a>(
-    trigger_sensor_id: &String,
-    sensor_data: &'a Option<Vec<SensorData>>,
-) -> Option<&'a SensorData> {
-    let mut function_return: Option<&SensorData> = None;
-    match sensor_data {
-        Some(x) => {
-            for sensor_data_iter in x {
-                if sensor_data_iter.id == *trigger_sensor_id {
-                    println!(
-                        "trigger-sensor-id match. Sensor value = {:?}",
-                        sensor_data_iter.value
-                    );
-                    function_return = Some(&sensor_data_iter);
-                    break;
-                }
-            }
-        }
-        // The division was invalid
-        None => function_return = None,
-    }
-    function_return
-}
-
-pub fn     log_sensor_data(sensor_data: &Option<Vec<SensorData>>)
+pub fn log_sensor_data(sensor_data: &Option<Vec<SensorData>>)
 {
     match sensor_data {
         // The division was valid
