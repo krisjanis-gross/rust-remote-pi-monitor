@@ -12,7 +12,7 @@ pub fn validate_sensor_data(
     );
 
     let mut validation_result: (Option<bool>, String) = (None, "".to_string());
-    let validation_delta: (f32) = 0.05;
+    let validation_delta: f32 = 0.05;
 
     match validation_function.as_str() {
         ">" => {

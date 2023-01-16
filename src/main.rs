@@ -17,6 +17,7 @@ pub mod models;
 pub mod routes;
 pub mod schema;
 
+
 // This registers your database with Rocket, returning a `Fairing` that can be `.attach`'d to your
 // Rocket application to set up a connection pool for it and automatically manage it for you.
 #[database("rocket_app")]
@@ -33,6 +34,6 @@ fn main() {
             ],
         )
         .attach(DbConn::fairing())
-        .attach(cors::CorsFairing) // Add this line
+        .attach(cors::CorsFairing)
         .launch();
 }

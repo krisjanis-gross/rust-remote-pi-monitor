@@ -1,12 +1,11 @@
-//use diesel::dsl::*;
 use diesel::{self, prelude::*};
+
 use rocket_contrib::json::Json;
 
 use crate::models::ApiKey;
 use crate::DbConn;
 use crate::models::CheckinData;
 use crate::models::SensorData;
-
 
 pub mod send_email;
 pub mod trigger_validation;
@@ -15,12 +14,11 @@ use crate::models::SensorTriggersList;
 
 use chrono::NaiveDateTime;
 
+
 #[get("/")]
 pub fn index() -> &'static str {
     "remote-pi-monitor successfully started!"
 }
-
-
 
 #[post("/checkin", data = "<checkin_data>")]
 pub fn process_node_checkin(
@@ -31,6 +29,8 @@ pub fn process_node_checkin(
         "Checkin-data: API-key={} node_id={}",
         checkin_data.api_key, checkin_data.node_id
     );
+
+
     // check if API key is valid
     use crate::schema::api_keys::dsl::*;
     let api_key_check = api_keys
