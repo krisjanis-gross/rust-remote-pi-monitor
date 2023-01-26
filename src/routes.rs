@@ -245,8 +245,8 @@ pub fn sensor_trigger_check(
                     x.value,
                 );
                 sensor_name_email = x.sensor_name.clone();
-                println!("Validation result = {:?}", validation_result.0);
-                println!("Validation email message = {}", validation_result.1);
+                debug!("Validation result = {:?}", validation_result.0);
+                debug!("Validation email message = {}", validation_result.1);
             }
         }
         // send e-mail notifications (if needed)  and update status in DB
