@@ -17,13 +17,13 @@ pub mod models;
 pub mod routes;
 pub mod schema;
 
-
 // This registers your database with Rocket, returning a `Fairing` that can be `.attach`'d to your
 // Rocket application to set up a connection pool for it and automatically manage it for you.
 #[database("rocket_app")]
 pub struct DbConn(diesel::MysqlConnection);
 
 fn main() {
+    env_logger::init();
     rocket::ignite()
         .mount(
             "/",

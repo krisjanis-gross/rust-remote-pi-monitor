@@ -14,6 +14,10 @@ use crate::models::SensorTriggersList;
 
 use chrono::NaiveDateTime;
 
+use log::debug;
+use log::error;
+use log::info;
+use log::warn;
 
 #[get("/")]
 pub fn index() -> &'static str {
@@ -29,7 +33,11 @@ pub fn process_node_checkin(
         "Checkin-data: API-key={} node_id={}",
         checkin_data.api_key, checkin_data.node_id
     );
-
+    env_logger::init();
+    debug!("Mary has a little lamb");
+    error!("{}", "Its fleece was white as snow");
+    info!("{:?}", "And every where that Mary went");
+    warn!("{:#?}", "The lamb was sure to go");
 
     // check if API key is valid
     use crate::schema::api_keys::dsl::*;
@@ -125,17 +133,24 @@ pub fn send_email_alerts(conn: DbConn) -> &'static str {
     use crate::models::Nodeslist;
     use crate::schema::nodes::dsl::*;
 
+/*
+    debug!("Mary has a little lamb");
+    error!("{}", "Its fleece was white as snow");
+    info!("{:?}", "And every where that Mary went");
+    warn!("{:#?}", "The lamb was sure to go");
+*/
     let offline_nodes_list = nodes
         .filter(monitoring_enabled.eq(1))
         .filter(notification_email_list.ne(""))
         .filter(offline_notification_sent.ne(1))
         .filter(last_checkin_timestamp.lt(diesel::dsl::sql("UTC_TIMESTAMP() - interval 5 minute")))
         .load::<Nodeslist>(&conn.0)
-        .expect("Error loading offline nodes list");
+        .expect("DB error loading offline nodes list");
 
+    let offline_nodes_count = offline_nodes_list.len();
     for offline_node in offline_nodes_list {
         //println!("offline node: {:?}", offline_node);
-        println!(
+        debug!(
             "offline node: id={} ext_id={} last_seen={:?} email_list={:?}",
             offline_node.id,
             offline_node.node_id_external,
@@ -151,17 +166,17 @@ pub fn send_email_alerts(conn: DbConn) -> &'static str {
                 &offline_node.last_checkin_timestamp,
             );
         } else {
-            println!("Can not send notification. recipient list not set");
+            error!("Can not send notification. Recipient list not defined");
         }
 
         // update nodes table- enable flag  offline_notification_sent
         diesel::update(nodes.filter(id.eq(offline_node.id)))
             .set(offline_notification_sent.eq(1))
             .execute(&conn.0)
-            .expect("error executing query");
+            .expect("DB error executing node status update query");
     }
-
-    "hello"
+    info!("/alert-sender done. offline_nodes_count = {:?}.", offline_nodes_count );
+    "ok"
 }
 
 #[get("/")]
