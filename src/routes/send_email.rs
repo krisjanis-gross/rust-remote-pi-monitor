@@ -11,6 +11,10 @@ use lettre::{
 use compound_duration::format_dhms;
 use std::env;
 
+use log::debug;
+//use log::error;
+
+
 pub fn send_email_generic(
     notification_recipient_list: &String,
     subject: &String,
@@ -39,7 +43,7 @@ pub fn send_email_generic(
     let mut email: Message;
 
     for email_destionation in notification_recipient_list.split(";") {
-        println!("sending email to {}", email_destionation);
+        debug!("sending email to {}", email_destionation);
 
         email = Message::builder()
             .from("rpi monitor<rpi@betras.lv>".parse().unwrap())
@@ -63,7 +67,7 @@ pub fn send_email_generic(
 
         // Send the email(s)
         match mailer.send(&email) {
-            Ok(_) => println!("Email sent successfully!"),
+            Ok(_) => debug!("Email sent successfully!"),
             Err(e) => panic!("Could not send email: {:?}", e),
         }
     }

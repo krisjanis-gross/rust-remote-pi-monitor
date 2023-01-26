@@ -17,7 +17,7 @@ use chrono::NaiveDateTime;
 use log::debug;
 use log::error;
 use log::info;
-use log::warn;
+//use log::warn;
 
 #[get("/")]
 pub fn index() -> &'static str {
@@ -29,16 +29,16 @@ pub fn process_node_checkin(
     conn: DbConn,
     checkin_data: Json<CheckinData>,
 ) -> Result<String, String> {
-    println!(
+    debug!(
         "Checkin-data: API-key={} node_id={}",
         checkin_data.api_key, checkin_data.node_id
     );
-    env_logger::init();
+   /*
     debug!("Mary has a little lamb");
     error!("{}", "Its fleece was white as snow");
     info!("{:?}", "And every where that Mary went");
     warn!("{:#?}", "The lamb was sure to go");
-
+*/
     // check if API key is valid
     use crate::schema::api_keys::dsl::*;
     let api_key_check = api_keys
@@ -48,7 +48,7 @@ pub fn process_node_checkin(
         .expect("Error loading api keys");
 
     if api_key_check.len() > 0 {
-        println!(
+        debug!(
             "api_key OK. id={}  api_key={}",
             api_key_check[0].id, api_key_check[0].api_key
         );
@@ -64,7 +64,7 @@ pub fn process_node_checkin(
             .expect("error executing query");
 
         if checkin_node.len() > 0 {
-            println!(
+            debug!(
                 "node_id found = {}. Updating checkin timestamp ",
                 checkin_node[0].id
             );
@@ -81,7 +81,7 @@ pub fn process_node_checkin(
                         &checkin_node[0].last_checkin_timestamp,
                     );
                 } else {
-                    println!("Can not send notification. recipient list not set");
+                    error!("Can not send notification. recipient list not set");
                 }
             }
 
@@ -92,7 +92,7 @@ pub fn process_node_checkin(
                 ))
                 .execute(&conn.0)
                 .expect("error executing query");
-            println!("updated rows count  = {:?}", result_rows_count);
+            debug!("updated rows count  = {:?}", result_rows_count);
 
             sensor_trigger_check(
                 &checkin_node[0].id,
@@ -105,7 +105,7 @@ pub fn process_node_checkin(
 
         // check sensor values end
         } else {
-            println!("node not found. need to insert new node record in db");
+            debug!("node not found. need to insert new node record in db");
             let insert_result = diesel::insert_into(nodes)
                 .values((
                     node_id_external.eq(&checkin_data.node_id),
@@ -114,15 +114,15 @@ pub fn process_node_checkin(
                 ))
                 .execute(&conn.0)
                 .expect("DB error executing query");
-            println!("inserted rows count  = {:?}", insert_result);
+            debug!("inserted rows count  = {:?}", insert_result);
         }
     } else {
-        println!("api_key not found");
+        error!("Api_key not found");
     }
 
     // insert or update node checkin data
-
-    Ok(format!("Checkin status: OK"))
+    info!("/checkin done. [...summary...] = ." );
+    Ok(format!("OK"))
 }
 
 #[get("/alert-sender")]
@@ -211,7 +211,7 @@ pub fn sensor_trigger_check(
 
     // iterate sensor triggers
     for sensor_trigger in sensor_trigger_list {
-        println!(
+        debug!(
             "Trigger check: sensor_triggers_id={} sensor_id={} monitoring_enabled={} trigger_notification_sent={} validation_function={} validation_parameter_1={:?} validation_parameter_2={:?} ",
             sensor_trigger.sensor_triggers_id,
             sensor_trigger.sensor_id,
@@ -269,10 +269,10 @@ pub fn sensor_trigger_check(
                     .execute(&dbconnection.0)
                     .expect("error executing query");
             } else {
-                println!("Can not send notification. recipient list not set");
+                error!("Can not send notification. recipient list not set");
             }
         } else if (validation_result.0 == Some(true)) & (sensor_trigger.trigger_notification_sent == 1) {
-            println!("sensor value is OK (was not OK) -> send notification");
+            debug!("sensor value is OK (was not OK) -> send notification");
             if let Some(x) = notification_email_list {
                 send_email::sensor_validation_ok_email(
                     node_id_external,
@@ -291,7 +291,7 @@ pub fn sensor_trigger_check(
                     .execute(&dbconnection.0)
                     .expect("error executing query");
             } else {
-                println!("Can not send notification. recipient list not set");
+                error!("Can not send notification. recipient list not set");
             }
         }
     }
@@ -305,13 +305,13 @@ pub fn log_sensor_data(sensor_data: &Option<Vec<SensorData>>)
         Some(x) => {
             // debug print sensor_values present in API call
             for sensor_value in x {
-                println!(
+                debug!(
                     "received sensor data : id={} sensor_name={} value={:?}",
                     sensor_value.id, sensor_value.sensor_name, sensor_value.value
                 );
             }
         }
         // The division was invalid
-        None => println!("No sensor data present in API call"),
+        None => debug!("No sensor data present in API call"),
     }
 }

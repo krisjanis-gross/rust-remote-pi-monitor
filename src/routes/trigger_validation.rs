@@ -1,12 +1,17 @@
 use crate::models::SensorData;
 
+use log::debug;
+use log::error;
+//use log::info;
+
+
 pub fn validate_sensor_data(
     validation_function: &String,
     validation_parameter_1: &Option<f32>,
     validation_parameter_2: &Option<f32>,
     sensor_value: f32,
 ) -> (Option<bool>, String) {
-    println!(
+    debug!(
         "Sensor data validation. Function '{}' parameter1 '{:?}' parameter2 '{:?}' sensor value '{}'",
         *validation_function, validation_parameter_1, validation_parameter_2,sensor_value
     );
@@ -16,7 +21,7 @@ pub fn validate_sensor_data(
 
     match validation_function.as_str() {
         ">" => {
-            println!("validation against > ");
+            debug!("validation against > ");
             match *validation_parameter_1 {
                 Some(x) => {
                     if sensor_value > ( x + validation_delta) {
@@ -33,11 +38,11 @@ pub fn validate_sensor_data(
                         );
                     }
                 }
-                None => println!("can not validate. parameter missing"),
+                None => error!("can not validate. parameter missing"),
             }
         }
         "<" => {
-            println!("validation against > ");
+            debug!("validation against > ");
             match *validation_parameter_1 {
                 Some(x) => {
                     if sensor_value < ( x - validation_delta) {
@@ -54,11 +59,11 @@ pub fn validate_sensor_data(
                         );
                     }
                 }
-                None => println!("can not validate. parameter missing"),
+                None => error!("can not validate. parameter missing"),
             }
         }
         "==" => {
-            println!("validation against == ");
+            debug!("validation against == ");
             match *validation_parameter_1 {
                 Some(x) => {
                     if sensor_value == x {
@@ -76,11 +81,11 @@ pub fn validate_sensor_data(
                     }
 
                 }
-                None => println!("can not validate. parameter missing"),
+                None => debug!("can not validate. parameter missing"),
             }
         }
         "!=" => {
-            println!("validation against != ");
+            debug!("validation against != ");
             match *validation_parameter_1 {
                 Some(x) => {
                     if sensor_value != x {
@@ -98,11 +103,11 @@ pub fn validate_sensor_data(
                     }
 
                 }
-                None => println!("can not validate. parameter missing"),
+                None => error!("can not validate. parameter missing"),
             }
         }
         "b" => {
-            println!("validation against b- range ");
+            debug!("validation against b- range ");
             match *validation_parameter_1 {
                 Some(x) => match *validation_parameter_2 {
                     Some(y) => {
@@ -115,12 +120,12 @@ pub fn validate_sensor_data(
                         }
 
                     }
-                    None => println!("can not validate. parameter missing"),
+                    None => error!("can not validate. parameter missing"),
                 },
-                None => println!("can not validate. parameter missing"),
+                None => error!("can not validate. parameter missing"),
             }
         }
-        &_ => println!("Validation function unknown"),
+        &_ => error!("Validation function unknown"),
     }
     validation_result
 }
@@ -134,7 +139,7 @@ pub fn find_sensor_data_by_id<'a>(
         Some(x) => {
             for sensor_data_iter in x {
                 if sensor_data_iter.id == *trigger_sensor_id {
-                    println!(
+                    debug!(
                         "trigger-sensor-id match. Sensor value = {:?}",
                         sensor_data_iter.value
                     );
