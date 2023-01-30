@@ -18,6 +18,7 @@ use log::debug;
 use log::error;
 use log::info;
 //use log::warn;
+//use env_logger::{Builder, Target};
 
 #[get("/")]
 pub fn index() -> &'static str {
@@ -33,19 +34,26 @@ pub fn process_node_checkin(
         "Checkin-data: API-key={} node_id={}",
         checkin_data.api_key, checkin_data.node_id
     );
+   /* let mut builder = Builder::from_default_env();
+    builder.target(Target::Stdout);
+
+    builder.init(); */
+
    /*
     debug!("Mary has a little lamb");
     error!("{}", "Its fleece was white as snow");
     info!("{:?}", "And every where that Mary went");
     warn!("{:#?}", "The lamb was sure to go");
 */
+    let mut log_status_message = "".to_string();
+
     // check if API key is valid
     use crate::schema::api_keys::dsl::*;
     let api_key_check = api_keys
         .filter(api_key.eq(&checkin_data.api_key))
         .limit(1)
         .load::<ApiKey>(&conn.0)
-        .expect("Error loading api keys");
+        .expect("DB error reading api keys");
 
     if api_key_check.len() > 0 {
         debug!(
@@ -54,6 +62,9 @@ pub fn process_node_checkin(
         );
         let api_key_id = api_key_check[0].id;
 
+        let status_message = format!("API-KEY = {} " , checkin_data.api_key);
+        log_status_message.push_str(&status_message );
+
         use crate::models::Nodeslist;
         use crate::schema::nodes::dsl::*;
         // find node id in db
@@ -61,13 +72,16 @@ pub fn process_node_checkin(
             .filter(fk_api_key_id.eq(api_key_id))
             .filter(node_id_external.eq(&checkin_data.node_id))
             .load::<Nodeslist>(&conn.0)
-            .expect("error executing query");
+            .expect("DB error executing query");
 
         if checkin_node.len() > 0 {
             debug!(
                 "node_id found = {}. Updating checkin timestamp ",
                 checkin_node[0].id
             );
+
+            let status_message_node = format!("node_id = {} " , checkin_data.node_id);
+            log_status_message.push_str(&status_message_node );
 
             let node_checkin_timestamp = chrono::Utc::now().naive_utc();
             // check whether node has been offline and has came online now.
@@ -115,13 +129,15 @@ pub fn process_node_checkin(
                 .execute(&conn.0)
                 .expect("DB error executing query");
             debug!("inserted rows count  = {:?}", insert_result);
+            let status_message_node_new = format!("New node inserted in DB. node_id = {} " , checkin_data.node_id);
+            log_status_message.push_str(&status_message_node_new );
         }
     } else {
         error!("Api_key not found");
     }
 
     // insert or update node checkin data
-    info!("/checkin done. [...summary...] = ." );
+    info!("/checkin done. {} [...]  .",log_status_message );
     Ok(format!("OK"))
 }
 
