@@ -1,4 +1,4 @@
-use chrono::{NaiveDateTime, TimeZone};
+use chrono::{ DateTime, Utc};
 use chrono_tz::Europe::Riga;
 
 use lettre::transport::smtp::authentication::Credentials;
@@ -8,10 +8,12 @@ use lettre::{
     Message, Transport,
 };
 
+
 use compound_duration::format_dhms;
-use std::env;
+use actix_web::web;
 
 use log::debug;
+use crate::config::Email;
 //use log::error;
 
 
@@ -20,36 +22,32 @@ pub fn send_email_generic(
     subject: &String,
     body_plain: &String,
     body_html: &String,
+    email_config: &web::Data<Email>,
 ) {
-    let env_variable_name = "email_account_password";
-    let email_account_password;
+    debug!("Email configuration: {} {} {}",email_config.smtp_server,email_config.username,email_config.password, ) ;
 
-    match env::var(env_variable_name) {
-        Ok(v) => email_account_password = v,
-        Err(e) => panic!("${} is not set ({})", env_variable_name, e),
-    }
     //    println!("Email account password = {}", email_account_password);
     let creds = Credentials::new(
-        "rpi@betras.lv".to_string(),
-        email_account_password.to_string(),
+        email_config.username.to_string(),
+        email_config.password.to_string(),
     );
 
     // Open a remote connection to gmail
-    let mailer = SmtpTransport::starttls_relay("smtp.gmail.com")
+    let mailer = SmtpTransport::starttls_relay(&email_config.smtp_server)
         .unwrap()
         .credentials(creds)
         .build();
 
     let mut email: Message;
 
-    for email_destionation in notification_recipient_list.split(";") {
-        debug!("sending email to {}", email_destionation);
+    for email_destination in notification_recipient_list.split(";") {
+        debug!("sending email to {}", email_destination);
 
         email = Message::builder()
-            .from("rpi monitor<rpi@betras.lv>".parse().unwrap())
-            .reply_to("rpi monitor<rpi@betras.lv>".parse().unwrap())
+            .from(email_config.username.to_string().parse().unwrap())
+            .reply_to(email_config.username.to_string().parse().unwrap())
             .subject(subject)
-            .to(email_destionation.parse().unwrap())
+            .to(email_destination.parse().unwrap())
             .multipart(
                 MultiPart::alternative() // This is composed of two parts.
                     .singlepart(
@@ -76,27 +74,32 @@ pub fn send_email_generic(
 pub fn send_node_offline_notification_email(
     node_id: &String,
     notification_recipient_list: &String,
-    checkin_timestamp: &NaiveDateTime,
+    last_checkin_timestamp: &DateTime<Utc>,
+    email_config: &web::Data<Email>,
 ) {
     let subject = format!("Node OFF-line: {}", node_id);
 
-    let timestamp_now = chrono::Utc::now().naive_utc();
-    let last_seen_minutes_ago = timestamp_now
-        .signed_duration_since(*checkin_timestamp)
-        .num_minutes();
-    let timestamp_riga_time = Riga.from_utc_datetime(&timestamp_now);
+    let checkin_timestamp  = Utc::now();
+    let offline_minutes = checkin_timestamp
+        .signed_duration_since(*last_checkin_timestamp)
+        .num_seconds();
+
+    let offline_duration_text = format_dhms(offline_minutes);
+
+
+    let last_checkin_timestamp_riga_time = checkin_timestamp.with_timezone(&Riga);
 
     let body_plain = format!(
         "Node - {} - is OFF-line. It was last seen {} minutes ago on {}.",
         node_id,
-        last_seen_minutes_ago,
-        timestamp_riga_time.format("%Y-%m-%d %H:%M:%S"),
+        offline_duration_text,
+        last_checkin_timestamp_riga_time.format("%Y-%m-%d %H:%M:%S"),
     );
     let body_html = format!(
         "Node - <b>{}</b> - is <span style='color:red'><b>OFF-line</b></span>. It was last seen {} minutes ago on {}.",
         node_id,
-        last_seen_minutes_ago,
-        timestamp_riga_time.format("%Y-%m-%d %H:%M:%S"),
+        offline_duration_text,
+        last_checkin_timestamp_riga_time.format("%Y-%m-%d %H:%M:%S"),
     );
 
     send_email_generic(
@@ -104,24 +107,29 @@ pub fn send_node_offline_notification_email(
         &subject,
         &body_plain,
         &body_html,
+        email_config,
     );
 }
 
 pub fn send_node_online_notification_email(
     node_id: &String,
     notification_recipient_list: &String,
-    checkin_timestamp: &NaiveDateTime,
-    last_checkin_timestamp: &NaiveDateTime,
+    checkin_timestamp: &DateTime<Utc>,
+    last_checkin_timestamp: &DateTime<Utc>,
+    email_config: &web::Data<Email>,
 ) {
+
     let offline_minutes = checkin_timestamp
         .signed_duration_since(*last_checkin_timestamp)
         .num_seconds();
 
-    let checkin_timestamp_riga_time = Riga.from_utc_datetime(&checkin_timestamp);
+    let offline_duration_text = format_dhms(offline_minutes);
+
+    debug!("offline_duration_text = {:?}" , &offline_duration_text);
+
+    let checkin_timestamp_riga_time = checkin_timestamp.with_timezone(&Riga);
 
     let subject = format!("Node ON-line: {}", node_id);
-
-    let offline_duration_text = format_dhms(offline_minutes);
 
     let body_plain = format!(
         "Node - {} - is ON-line since {}. It was offline for {}.",
@@ -141,19 +149,20 @@ pub fn send_node_online_notification_email(
         &subject,
         &body_plain,
         &body_html,
+        email_config,
     );
 }
 
 pub fn sensor_validation_failed_email(
     node_id: &String,
     notification_recipient_list: &String,
-    checkin_timestamp: &NaiveDateTime,
+    checkin_timestamp: &DateTime<Utc>,
     validation_message: &String,
     sensor_id: &String,
-    sensor_name: &String
+    sensor_name: &String,
+    email_config: &web::Data<Email>,
 ) {
-    let checkin_timestamp_riga_time = Riga.from_utc_datetime(&checkin_timestamp);
-
+    let checkin_timestamp_riga_time = checkin_timestamp.with_timezone(&Riga);
     let subject = format!("sensor validation FAILED: {}-{}", node_id, sensor_name);
 
     let body_plain = format!(
@@ -179,18 +188,20 @@ pub fn sensor_validation_failed_email(
         &subject,
         &body_plain,
         &body_html,
+        email_config,
     );
 }
 
 pub fn sensor_validation_ok_email(
     node_id: &String,
     notification_recipient_list: &String,
-    checkin_timestamp: &NaiveDateTime,
+    checkin_timestamp: &DateTime<Utc>,
     validation_message: &String,
     sensor_id: &String,
-    sensor_name: &String
+    sensor_name: &String,
+    email_config: &web::Data<Email>,
 ) {
-    let checkin_timestamp_riga_time = Riga.from_utc_datetime(&checkin_timestamp);
+    let checkin_timestamp_riga_time = checkin_timestamp.with_timezone(&Riga);
 
     let subject = format!("Sensor validation OK: {}-{}", node_id, sensor_name);
 
@@ -217,5 +228,6 @@ pub fn sensor_validation_ok_email(
         &subject,
         &body_plain,
         &body_html,
+        email_config,
     );
 }
