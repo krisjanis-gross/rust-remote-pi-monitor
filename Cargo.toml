@@ -1,30 +1,35 @@
 [package]
 name = "rust-remote-pi-monitor"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 actix-web = "4"
+time = "0.3.44"
 
 dotenv = "0.15.0"
-config = "0.13.3"
+config = "0.15.17"
 
-serde = { version = "1.0.159", features = ["derive"] }
-deadpool-postgres = { version = "0.10.5", features = ["serde"] }
-derive_more = "0.99.0"
+serde = { version = "1.0.227", features = ["derive"] }
+deadpool-postgres = { version = "0.14.1", features = ["serde"] }
+derive_more = "2.0.1"
 
 
-tokio-postgres = { version = "0.7.8", features = ["with-chrono-0_4"] }
+tokio-postgres = { version = "0.7.14", features = ["with-chrono-0_4"] }
 tokio-pg-mapper = "0.2.0"
 tokio-pg-mapper-derive = "0.2.0"
 
-log = "0.4"
-env_logger = "0.10.0"
+log = "0.4.28"
+env_logger = "0.11.8"
 
-lettre = "0.10.4"
-compound_duration = "1.2.0"
-chrono = { version = "0.4.23", features = ["serde"] }
-chrono-tz = "0.8.1"
-humantime = "2.1.0"
+lettre = "0.11.18"
+compound_duration = "1.2.1"
+chrono = { version = "0.4.42", features = ["serde"] }
+chrono-tz = "0.10.4"
+humantime = "2.3.0"
+
+
+rustygram = "0.1.4"
+tokio = { version = "1.8", features = ["rt-multi-thread", "macros"] }

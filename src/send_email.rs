@@ -13,18 +13,20 @@ use compound_duration::format_dhms;
 use actix_web::web;
 
 use log::debug;
-use crate::config::Email;
+use crate::models::{Email, TelegramConfig};
+use crate::send_telegram;
 //use log::error;
 
 
-pub fn send_email_generic(
+pub async fn send_email_generic(
     notification_recipient_list: &String,
     subject: &String,
     body_plain: &String,
     body_html: &String,
     email_config: &web::Data<Email>,
+    telegram_config:&web::Data<TelegramConfig>,
 ) {
-    debug!("Email configuration: {} {} {}",email_config.smtp_server,email_config.username,email_config.password, ) ;
+    debug!("Email configuration: {} {}",email_config.smtp_server,email_config.username, ) ;
 
     //    println!("Email account password = {}", email_account_password);
     let creds = Credentials::new(
@@ -63,19 +65,26 @@ pub fn send_email_generic(
             )
             .unwrap();
 
+
         // Send the email(s)
         match mailer.send(&email) {
             Ok(_) => debug!("Email sent successfully!"),
-            Err(e) => panic!("Could not send email: {:?}", e),
+            Err(e) => {
+                // send message to telegram
+                let message:String = format!("Error sending email");
+                send_telegram::send_telegram_msg(&message,telegram_config).await;
+                panic!("Could not send email: {:?}", e);
+                },
         }
     }
 }
 
-pub fn send_node_offline_notification_email(
+pub async fn send_node_offline_notification_email(
     node_id: &String,
     notification_recipient_list: &String,
     last_checkin_timestamp: &DateTime<Utc>,
     email_config: &web::Data<Email>,
+    telegram_config: &web::Data<TelegramConfig>,
 ) {
     let subject = format!("Node OFF-line: {}", node_id);
 
@@ -108,15 +117,17 @@ pub fn send_node_offline_notification_email(
         &body_plain,
         &body_html,
         email_config,
-    );
+        telegram_config,
+    ).await;
 }
 
-pub fn send_node_online_notification_email(
+pub async fn send_node_online_notification_email(
     node_id: &String,
     notification_recipient_list: &String,
     checkin_timestamp: &DateTime<Utc>,
     last_checkin_timestamp: &DateTime<Utc>,
     email_config: &web::Data<Email>,
+    telegram_config:&web::Data<TelegramConfig>,
 ) {
 
     let offline_minutes = checkin_timestamp
@@ -150,10 +161,11 @@ pub fn send_node_online_notification_email(
         &body_plain,
         &body_html,
         email_config,
-    );
+        telegram_config,
+    ).await;
 }
 
-pub fn sensor_validation_failed_email(
+pub async fn sensor_validation_failed_email(
     node_id: &String,
     notification_recipient_list: &String,
     checkin_timestamp: &DateTime<Utc>,
@@ -161,6 +173,7 @@ pub fn sensor_validation_failed_email(
     sensor_id: &String,
     sensor_name: &String,
     email_config: &web::Data<Email>,
+    telegram_config:&web::Data<TelegramConfig>,
 ) {
     let checkin_timestamp_riga_time = checkin_timestamp.with_timezone(&Riga);
     let subject = format!("sensor validation FAILED: {}-{}", node_id, sensor_name);
@@ -189,10 +202,11 @@ pub fn sensor_validation_failed_email(
         &body_plain,
         &body_html,
         email_config,
-    );
+        telegram_config,
+    ).await;
 }
 
-pub fn sensor_validation_ok_email(
+pub async fn sensor_validation_ok_email(
     node_id: &String,
     notification_recipient_list: &String,
     checkin_timestamp: &DateTime<Utc>,
@@ -200,6 +214,7 @@ pub fn sensor_validation_ok_email(
     sensor_id: &String,
     sensor_name: &String,
     email_config: &web::Data<Email>,
+    telegram_config:&web::Data<TelegramConfig>,
 ) {
     let checkin_timestamp_riga_time = checkin_timestamp.with_timezone(&Riga);
 
@@ -229,5 +244,6 @@ pub fn sensor_validation_ok_email(
         &body_plain,
         &body_html,
         email_config,
-    );
+        telegram_config,
+    ).await;
 }
