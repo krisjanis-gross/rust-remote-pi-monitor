@@ -219,10 +219,8 @@ use handlers::checkin_node;
 use handlers::alert_sender;
 use env_logger::{Builder, Target};
 use log::{info};
-
-use crate::models::AppConfig;
 use crate::models::TelegramConfig;
-
+use crate::models::Email;
 
 
 #[actix_web::main] // or #[tokio::main]
@@ -233,31 +231,69 @@ async fn main() -> std::io::Result<()> {
     builder.target(Target::Stdout);
     builder.init();
 
+/*  debug print env. values
+for (key, value) in std::env::vars() {
+    println!("{} = {}", key, value);
+}
+*/
+
 
     let config_ = Config::builder()
         .add_source(::config::Environment::default())
         .build()
         .unwrap();
 
-    let config: AppConfig = config_.try_deserialize().unwrap();
-    info!("Email configuration: {} {}",config.email.smtp_server,config.email.username ) ;
 
-    let telegram_config_parameter: TelegramConfig = config.telegram_config.clone();
+ //   println!("config: {:?} ", config_);
 
-    let pool = config.pg.create_pool(None, NoTls).unwrap();
+  
+    let email_config = Email {
+    smtp_server: config_.get("email_smtp_server").unwrap(),
+    username:  config_.get("email_username").unwrap(),
+    password: config_.get("email_password").unwrap(),
+};
+
+  // println!("email config: {:?} ", email_config);
+
+
+    let telegram_config = TelegramConfig {
+        bot_token: config_.get("telegram_config_bot_token").unwrap(),
+        channel_id: config_.get("telegram_config_channel_id").unwrap(),
+    };
+
+ // println!("tel config: {:?} ", telegram_config);
+
+  let server_addr:String = config_.get("server_addr").unwrap();
+ 
+ let pgconfig = deadpool_postgres::Config {
+        user:config_.get("pg_user").unwrap(),
+        password:config_.get("pg_password").unwrap(),
+        host:config_.get("pg_host").unwrap(),
+        port:config_.get("pg_port").unwrap(),
+        dbname:config_.get("pg_dbname").unwrap(),
+        ..Default::default()
+       // pool.max_size:config_.get("pg_pool_max_size").unwrap(),
+ };
+
+    //let config: AppConfig = config_.try_deserialize().unwrap();
+    info!("Email configuration: {} {}",email_config.smtp_server,email_config.username ) ;
+
+    let telegram_config_parameter: TelegramConfig = telegram_config.clone();
+
+    let pool = pgconfig.create_pool(None, NoTls).unwrap();
 
     let server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
-            .app_data( web::Data::new( config.email.clone()))
-            .app_data( web::Data::new( config.telegram_config.clone()))
+            .app_data( web::Data::new( email_config.clone()))
+            .app_data( web::Data::new( telegram_config.clone()))
             .service(web::resource("/").route(web::get().to(status_check)))
             .service(web::resource("/checkin").route(web::post().to(checkin_node)))
             .service(web::resource("/alert-sender").route(web::get().to(alert_sender)))
     })
-        .bind(config.server_addr.clone())?
+        .bind(server_addr.clone())?
         .run();
-    info!("Server running at http://{}/", config.server_addr);
+    info!("Server running at http://{}/", server_addr);
     
    
     let startup_message:String = format!("Server startup complete");

@@ -1,6 +1,6 @@
-FROM debian:jessie AS builder
+FROM debian:latest AS builder
 RUN apt-get update && apt-get upgrade -y
-RUN apt-get update && apt-get install -y --force-yes curl libmysqlclient-dev build-essential pkg-config libssl-dev ca-certificates
+RUN apt-get update && apt-get install -y --force-yes curl  build-essential pkg-config libssl-dev ca-certificates
 
 # Install rust
 RUN curl https://sh.rustup.rs/ -sSf | \
@@ -9,12 +9,11 @@ RUN curl https://sh.rustup.rs/ -sSf | \
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 ADD . ./
-
 RUN cargo build --release
 
-FROM debian:jessie
+FROM debian:latest
 RUN apt-get update && apt-get upgrade -y
-RUN apt-get update && apt-get install -y --force-yes libmysqlclient-dev pkg-config libssl-dev ca-certificates
+RUN apt-get update && apt-get install -y --force-yes pkg-config libssl-dev ca-certificates
 
 COPY --from=builder \
   /target/release/rust-remote-pi-monitor \

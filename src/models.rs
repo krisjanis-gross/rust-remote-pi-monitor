@@ -42,16 +42,6 @@
         pub offline_notification_sent: bool,
     }
 
-
-    
-    #[derive(Debug, Default, Deserialize,Clone)]
-    pub struct AppConfig {
-        pub server_addr: String,
-        pub pg: deadpool_postgres::Config,
-        pub email: Email,
-        pub telegram_config: TelegramConfig,
-    }
-
     #[derive(Debug, Default, Deserialize,Clone)]
     pub struct Email {
         pub smtp_server: String,
